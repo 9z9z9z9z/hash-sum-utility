@@ -14,3 +14,4 @@
 1) elden-ring-nawpic-11.jpg
 2) config.json
 3) main_contorls.blk
+4) Несуществующий файл test.txt
