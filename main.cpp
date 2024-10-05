@@ -1,12 +1,11 @@
 #include <iostream>
 #include <fstream>
-#include <string>
 #include <vector>
 #include <sstream>
 #include <algorithm>
 
+#include "Exceptions.h"
 #include "colors.h"
-#include <bitset>
 
 
 const static std::string PATH = "path";
@@ -45,13 +44,11 @@ namespace JsonFuncs {
         }
     };
 
-    int checkCurrentFile(const std::string &filePath, const uint32_t hashSum) {
-        int retCode = 0;
+    bool checkCurrentFile(const std::string &filePath, const uint32_t hashSum) {
         size_t currentBit = 0;
         std::ifstream file(filePath, std::ifstream::binary);
         if (!file.is_open()) {
-            std::cerr << KRED << "\nCannot open " << filePath << " file\n" << RST;
-            retCode = -1;
+            throw Exceptions::FILE_OPEN_ERR("Cannot open " + filePath + " file\n");
         } else {
             uint32_t hash = 0x00000000;
             file.seekg(0, file.end);
@@ -78,32 +75,27 @@ namespace JsonFuncs {
                 std::cerr   << "\nFile " << filePath << " was changed\n";
                 std::cerr   << "Calculated hash is " << std::hex << hash
                             << " expected " << std::hex << hashSum << '\n';
-                retCode = 1;
+                return false;
             } else {
                 std::cout   << "\nFile " << filePath << " is correct\n";
                 std::cout   << "Calculated hash is " << std::hex << hash
                             << " expected " << std::hex << hashSum << '\n';
+                return true;
             }
         }
-        return retCode;
     }
 
     std::string extractValue(const std::string &line, const std::string &key) {
         size_t pos = line.find(key);
-        if (line.data() == nullptr) {
-            std::cerr << KRED << "Cannot extract " << key << " from " << line << '\n' << RST;
-            return "";
-        }
-        if (pos == std::string::npos) {
-            std::cerr << KRED << "Cannot find " << key << " in " << line << '\n' << RST;
-            return "";
+        if (pos == std::string::npos || line.data() == nullptr) {
+            throw Exceptions::JSON_VAL_EXTRUCT_ERR("Cannot extract " + key + " from " + line + '\n');
         }
         pos += key.length();
         ++pos;
         pos = line.find(":", pos);
         if (pos == std::string::npos) {
             std::cerr << KRED << R"(Cannot find ":" in )" << line << '\n' << RST;
-            return "";
+            throw Exceptions::JSON_IN_LINE_ERR("Error in json file in " + line + '\n');
         }
         ++pos;
 
@@ -134,15 +126,24 @@ namespace JsonFuncs {
                 hash = 0;
                 ss << std::flush;
             }
-            if (line.find(PATH) != std::string::npos) {
-                path = extractValue(line, PATH);
+            try {
+                if (line.find(PATH) != std::string::npos) {
+                    path = extractValue(line, PATH);
+                }
+                if (line.find(HASH) != std::string::npos) {
+                    std::string val = extractValue(line, HASH);
+                    if (!val.empty()) {
+                        hash = static_cast<uint32_t>(std::stoul(val, nullptr, 16));
+                    }            
+                }
+            } catch (Exceptions::JSON_VAL_EXTRUCT_ERR jveEx) {
+                std::cerr << KRED << jveEx.what() << RST;
+                throw;
+            } catch (Exceptions::JSON_IN_LINE_ERR jilEx) {
+                std::cerr << KRED << jilEx.what() << RST;
+                throw;
             }
-            if (line.find(HASH) != std::string::npos) {
-                std::string val = extractValue(line, HASH);
-                if (!val.empty()) {
-                    hash = static_cast<uint32_t>(std::stoul(val, nullptr, 16));
-                }            
-            }
+            
         }
         return jsonFiles;
     }
@@ -152,28 +153,34 @@ namespace JsonFuncs {
 bool hashSumChecking(const std::string &jsonFilePath) {
     std::ifstream file(jsonFilePath);
     if (!file.is_open()) {
-        std::cerr << KRED << "Cannot open " << jsonFilePath << '\n' << RST;
-        return false;
+        throw Exceptions::FILE_OPEN_ERR("Cannot open " + jsonFilePath + '\n');
     } else {
-        std::vector<JsonFuncs::JsonFile> files = JsonFuncs::parseJsonFile(file);
-        size_t size = files.size();
-        size_t count = 0;
-        for (std::vector<JsonFuncs::JsonFile>::iterator it = files.begin(); it != files.end(); ++it) {
-            int code = JsonFuncs::checkCurrentFile(it->filePath, it->hashSum);
-            if (code == 0) {
-                ++count;
-            } else if (code == -1) {
-                --size;
+        try {
+            std::vector<JsonFuncs::JsonFile> files = JsonFuncs::parseJsonFile(file);
+            size_t size = files.size();
+            size_t count = 0;
+            for (std::vector<JsonFuncs::JsonFile>::iterator it = files.begin(); it != files.end(); ++it) {
+                try {
+                    if (JsonFuncs::checkCurrentFile(it->filePath, it->hashSum)) {
+                        ++count;
+                    }
+                } catch (...) {
+                    --size;
+                    continue;
+                }
             }
-        }
-        file.close();
-        return count == size;
+            file.close();
+            return count == size;
+        } catch (...) {
+            file.close();
+            return false;
+        }        
     }
 }
 
-int test() {
+bool test() {
     std::cout << "\nTesting is started...\n";
-    int test_flag = 0;
+    bool test_result = true;
     std::cout << FYEL("==============================================================\n");
     std::cout << "Testing crc32 algorythm (string 123456789):\n";
     {
@@ -191,52 +198,62 @@ int test() {
             std::cout << FGRN("Test passed") << '\n';
         } else {
             std::cout << FRED("Test failed") << '\n';
-            test_flag = 1;
+            test_result = false;
         }        
     }
     std::cout << FYEL("==============================================================\n");
     std::cout << "Testing crc32 for single file (config.json):\n";
     {
-        std::ifstream file("config.json", std::ifstream::binary);
-        if (!file.is_open()) {
-            std::cerr << "Missing testing file...\n";
-        } else {
-            file.close();
+        try {
             uint32_t test_Hash = 0xf4c9c4c8;
-            int retCode = JsonFuncs::checkCurrentFile("config.json", test_Hash);    
 
-            if (retCode == 0) {
+            if (JsonFuncs::checkCurrentFile("config.json", test_Hash)) {
                 std::cout << FGRN("Test passed") << '\n';
             } else {
                 std::cerr << FRED ("Test failed") << '\n';
-                test_flag = 1;
+                test_result = false;
             }
+        } catch (Exceptions::FILE_OPEN_ERR foEx) {
+            std::cerr << KRED << foEx.what();
+            std::cerr << "Cannot do this test\n" << RST;
         }
+        
     }
     std::cout << FYEL("==============================================================\n");
     std::cout << "Testing crc32 for table of files (reading from testing table.json):\n";
     {
-        if (hashSumChecking("table.json")) {
-            std::cout << KGRN << "\nTest passed\n";
-        } else {
-            std::cerr << KRED << "\nTest failed\n";
-            test_flag = 1;
+        try {
+            if (hashSumChecking("table.json")) {
+                std::cout << KGRN << "\nTest passed\n";
+            } else {
+                std::cerr << KRED << "\nTest failed\n";
+                test_result = false;
+            }
+        } catch (Exceptions::FILE_OPEN_ERR ex) {
+            std::cerr << KRED << ex.what();
+            std::cout << "Cannot do this test\n" << RST;
         }
+        
     }    
     std::cout << FYEL("==============================================================\n") << std::endl;
-    return test_flag;
+    return test_result;
 }
 
 int main(int argc, char **argv) {
     if (std::string(argv[1]) == "-test") {
         return test();
     }
-    //else  {
-    //     if (hashSumChecking(argv[1])) {
-    //         std::cout << KGRN << "\nAll files are correct\n" << RST << std::endl;
-    //     } else {
-    //         std::cout << KRED << "\nSome files were changed\n" << RST << std::endl;
-    //     }
-    //     return 0;
-    // }    
+    else  {
+        try {
+            if (hashSumChecking(argv[1])) {
+                std::cout << KGRN << "\nAll files are correct\n" << RST << std::endl;
+            } else {
+                std::cout << KRED << "\nSome files were changed\n" << RST << std::endl;
+            }
+        } catch (Exceptions::FILE_OPEN_ERR foEx) {
+            std::cerr << KRED << foEx.what() << '\n' << RST;
+        }
+        
+        return 0;
+    }    
 }
