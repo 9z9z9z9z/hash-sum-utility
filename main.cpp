@@ -50,7 +50,7 @@ namespace JsonFuncs {
         size_t currentBit = 0;
         std::ifstream file(filePath, std::ifstream::binary);
         if (!file.is_open()) {
-            std::cerr << KRED << "Cannot open " << filePath << " file\n" << RST;
+            std::cerr << KRED << "\nCannot open " << filePath << " file\n" << RST;
             retCode = -1;
         } else {
             uint32_t hash = 0x00000000;
@@ -156,14 +156,18 @@ bool hashSumChecking(const std::string &jsonFilePath) {
         return false;
     } else {
         std::vector<JsonFuncs::JsonFile> files = JsonFuncs::parseJsonFile(file);
+        size_t size = files.size();
         size_t count = 0;
         for (std::vector<JsonFuncs::JsonFile>::iterator it = files.begin(); it != files.end(); ++it) {
-            if (JsonFuncs::checkCurrentFile(it->filePath, it->hashSum) == 0) {
+            int code = JsonFuncs::checkCurrentFile(it->filePath, it->hashSum);
+            if (code == 0) {
                 ++count;
+            } else if (code == -1) {
+                --size;
             }
         }
         file.close();
-        return count == files.size();
+        return count == size;
     }
 }
 
