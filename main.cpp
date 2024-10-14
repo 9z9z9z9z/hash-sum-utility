@@ -128,8 +128,14 @@ namespace FilesFuncs {
                 }
 
                 JsonFile fileInfo;
-                fileInfo.filePath = item["path"].get<std::string>();
-                fileInfo.hashSum = std::stoul(item["hash"].get<std::string>(), nullptr, 16);               ;
+                std::string buff;
+                buff = item["path"].get<std::string>();
+                buff.erase(std::remove(buff.begin(), buff.end(), ' '), buff.end());
+                fileInfo.filePath = buff;
+
+                buff = item["hash"].get<std::string>();
+                buff.erase(std::remove(buff.begin(), buff.end(), ' '), buff.end());
+                fileInfo.hashSum = std::stoul(buff, nullptr, 16);
 
                 files.push_back(fileInfo);
             }
