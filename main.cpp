@@ -6,7 +6,7 @@
 
 #include "Exceptions.h"
 #include "colors.h"
-
+#include "json.hpp"
 
 const static std::string PATH = "path";
 const static std::string HASH = "hash";
@@ -33,16 +33,31 @@ namespace CRC {
     }
 }
 
-namespace JsonFuncs {
+namespace FilesFuncs {
     struct JsonFile {
         std::string filePath;
         uint32_t hashSum;
-        
+        JsonFile() {}
         JsonFile(const std::string &rFilePath, uint32_t rHashSum) {
             filePath = rFilePath;
             hashSum = rHashSum;
         }
     };
+
+    size_t fileSize(const std::string &filePath) { 
+        try {
+            std::ifstream file(filePath, std::ios::binary | std::ios::ate);
+            if (file.is_open()) {
+                size_t ret = file.tellg();
+                file.close();
+                return ret;
+            } else {
+                 return -1;
+            }            
+        } catch (...) {
+            return -1;
+        }
+    }
 
     bool checkCurrentFile(const std::string &filePath, const uint32_t hashSum) {
         size_t currentBit = 0;
@@ -51,9 +66,10 @@ namespace JsonFuncs {
             throw Exceptions::FILE_OPEN_ERR("Cannot open " + filePath + " file\n");
         } else {
             uint32_t hash = 0x00000000;
-            file.seekg(0, file.end);
-            size_t fileLength = file.tellg();
-            file.seekg(0, file.beg);
+            size_t fileLength = fileSize(filePath);
+            if (fileLength <= 0) {
+                throw Exceptions::FILE_SIZE_ERR(filePath + " file is empty\n");
+            }
             size_t buffSize = 32;            
             size_t readedBits = 0;
             char *buff = new char[buffSize];
@@ -85,97 +101,66 @@ namespace JsonFuncs {
         }
     }
 
-    std::string extractValue(const std::string &line, const std::string &key) {
-        size_t pos = line.find(key);
-        if (pos == std::string::npos || line.data() == nullptr) {
-            throw Exceptions::JSON_VAL_EXTRUCT_ERR("Cannot extract " + key + " from " + line + '\n');
-        }
-        pos += key.length();
-        ++pos;
-        pos = line.find(":", pos);
-        if (pos == std::string::npos) {
-            std::cerr << KRED << R"(Cannot find ":" in )" << line << '\n' << RST;
-            throw Exceptions::JSON_IN_LINE_ERR("Error in json file in " + line + '\n');
-        }
-        ++pos;
-
-        while (pos < line.size() && (line[pos] == ' ' || line[pos] == '"')) {
-            ++pos;
-        }
-
-        size_t endPos = line.find_first_of(",", pos);
-        if (endPos == std::string::npos) {
-            endPos = line.size();
-        }
-
-        std::string value = line.substr(pos, endPos - pos);
-        value.erase(remove(value.begin(), value.end(), '"'), value.end());
-        return value;
-    }
-
-    std::vector<JsonFile> parseJsonFile(std::ifstream &file) {
-        std::vector<JsonFile> jsonFiles;
-        std::string line;
-        std::stringstream ss;
-        std::string path;
-        uint32_t hash;
-        while (std::getline(file, line)) {
-            if (line.find("},") != std::string::npos || line.find("]") != std::string::npos) {
-                jsonFiles.push_back(JsonFile(path, hash));
-                path = "";
-                hash = 0;
-                ss << std::flush;
-            }
-            try {
-                if (line.find(PATH) != std::string::npos) {
-                    path = extractValue(line, PATH);
-                }
-                if (line.find(HASH) != std::string::npos) {
-                    std::string val = extractValue(line, HASH);
-                    if (!val.empty()) {
-                        hash = static_cast<uint32_t>(std::stoul(val, nullptr, 16));
-                    }            
-                }
-            } catch (Exceptions::JSON_VAL_EXTRUCT_ERR jveEx) {
-                std::cerr << KRED << jveEx.what() << RST;
-                throw;
-            } catch (Exceptions::JSON_IN_LINE_ERR jilEx) {
-                std::cerr << KRED << jilEx.what() << RST;
-                throw;
+    std::vector<JsonFile> parseJsonFile(const std::string& jsonFilePath) {
+        std::vector<JsonFile> files;
+        
+        try {
+            std::ifstream file(jsonFilePath);
+            if (!file.is_open()) {
+                throw Exceptions::FILE_OPEN_ERR("Cannot open file.");
             }
             
+            nlohmann::json jsonData;
+            file >> jsonData;
+            
+            if (!jsonData.contains("files") || !jsonData["files"].is_array()) {
+                throw Exceptions::JSON_VAL_EXTRUCT_ERR("Invalid JSON format: Missing 'files' array.");
+            }
+            
+            for (const auto& item : jsonData["files"]) {
+                if (!item.contains("path") || !item.contains("hash")) {
+                    std::cerr << KRED << "Missing file: Nesessary fields are empty.\n" << RST;
+                    continue;
+                }
+                if (!item["path"].is_string() || !item["hash"].is_string()) {
+                    std::cerr << KRED << "Missing file: Invalid field's data.\n" << RST;
+                    continue;
+                }
+
+                JsonFile fileInfo;
+                fileInfo.filePath = item["path"].get<std::string>();
+                fileInfo.hashSum = std::stoul(item["hash"].get<std::string>(), nullptr, 16);               ;
+
+                files.push_back(fileInfo);
+            }
+        } catch (const std::exception& e) {
+            std::cerr << KRED << "Error in JSON parsing: " << e.what() << '\n' << RST;
         }
-        return jsonFiles;
+
+        return files;
     }
 
 }
 
 bool hashSumChecking(const std::string &jsonFilePath) {
-    std::ifstream file(jsonFilePath);
-    if (!file.is_open()) {
-        throw Exceptions::FILE_OPEN_ERR("Cannot open " + jsonFilePath + '\n');
-    } else {
-        try {
-            std::vector<JsonFuncs::JsonFile> files = JsonFuncs::parseJsonFile(file);
-            size_t size = files.size();
-            size_t count = 0;
-            for (std::vector<JsonFuncs::JsonFile>::iterator it = files.begin(); it != files.end(); ++it) {
-                try {
-                    if (JsonFuncs::checkCurrentFile(it->filePath, it->hashSum)) {
-                        ++count;
-                    }
-                } catch (...) {
-                    --size;
-                    continue;
+    bool ret = true;
+    try {
+        std::vector<FilesFuncs::JsonFile> files = FilesFuncs::parseJsonFile(jsonFilePath);
+        size_t size = files.size();
+        size_t count = 0;
+        for (std::vector<FilesFuncs::JsonFile>::iterator it = files.begin(); it != files.end(); ++it) {
+            try {
+                if (!FilesFuncs::checkCurrentFile(it->filePath, it->hashSum)) {
+                    ret = false;
                 }
+            } catch (...) {
+                continue;
             }
-            file.close();
-            return count == size;
-        } catch (...) {
-            file.close();
-            return false;
-        }        
-    }
+        }
+        return ret;
+    } catch (...) {
+        return false;
+    }  
 }
 
 bool test() {
@@ -207,7 +192,7 @@ bool test() {
         try {
             uint32_t test_Hash = 0xf4c9c4c8;
 
-            if (JsonFuncs::checkCurrentFile("config.json", test_Hash)) {
+            if (FilesFuncs::checkCurrentFile("config.json", test_Hash)) {
                 std::cout << FGRN("Test passed") << '\n';
             } else {
                 std::cerr << FRED ("Test failed") << '\n';
