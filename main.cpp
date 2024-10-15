@@ -207,6 +207,9 @@ bool test() {
         } catch (Exceptions::FILE_OPEN_ERR foEx) {
             std::cerr << KRED << foEx.what();
             std::cerr << "Cannot do this test\n" << RST;
+        } catch (Exceptions::FILE_SIZE_ERR fsEx) {
+            std::cerr << KRED << fsEx.what();
+            std::cerr << "Cannot get file size\n" << RST;
         }
         
     }
