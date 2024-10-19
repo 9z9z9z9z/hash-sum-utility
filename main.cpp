@@ -52,10 +52,10 @@ namespace FilesFuncs {
                 file.close();
                 return ret;
             } else {
-                 return -1;
+                 return 0;
             }            
         } catch (...) {
-            return -1;
+            return 0;
         }
     }
 
@@ -64,75 +64,71 @@ namespace FilesFuncs {
         std::ifstream file(filePath, std::ifstream::binary);
         if (!file.is_open()) {
             throw Exceptions::FILE_OPEN_ERR("Cannot open " + filePath + " file\n");
-        } else {
-            uint32_t hash = 0x00000000;
-            size_t fileLength = fileSize(filePath);
-            if (fileLength <= 0) {
-                throw Exceptions::FILE_SIZE_ERR(filePath + " file is empty\n");
-            }
-            size_t buffSize = 32;            
-            size_t readedBits = 0;
-            char *buff = new char[buffSize];
-            while (readedBits + buffSize < fileLength) {
-                file.read(buff, buffSize);
-                readedBits += buffSize;
-                hash = CRC::crc32(buff, hash, buffSize);
-            }
+        }
+        uint32_t hash = 0x00000000;
+        size_t fileLength = fileSize(filePath);
+        if (fileLength == 0) {
+            throw Exceptions::FILE_SIZE_ERR(filePath + " file is empty\n");
+        }
+        size_t buffSize = 32;            
+        size_t readedBytes = 0;
+        char *buff = new char[buffSize];
+        while (readedBytes + buffSize < fileLength) {
+            file.read(buff, buffSize);
+            readedBytes += buffSize;
+            hash = CRC::crc32(buff, hash, buffSize);
+        }
+        delete buff;
+        if (readedBytes < fileLength) {
+            buffSize = fileLength - readedBytes;
+            buff = new char[buffSize];
+            file.read(buff, buffSize);
+            hash = CRC::crc32(buff, hash, buffSize);
             delete buff;
-            if (readedBits < fileLength) {
-                buffSize = fileLength - readedBits;
-                buff = new char[buffSize];
-                file.read(buff, buffSize);
-                hash = CRC::crc32(buff, hash, buffSize);
-            }
-            delete buff;
+        }            
 
-            if (hash != hashSum) {
-                std::cerr   << "\nFile " << filePath << " was changed\n";
-                std::cerr   << "Calculated hash is " << std::hex << hash
-                            << " expected " << std::hex << hashSum << '\n';
-                return false;
-            } else {
-                std::cout   << "\nFile " << filePath << " is correct\n";
-                std::cout   << "Calculated hash is " << std::hex << hash
-                            << " expected " << std::hex << hashSum << '\n';
-                return true;
-            }
+        if (hash != hashSum) {
+            std::cerr   << "\nFile " << filePath << " was changed\n";
+            std::cerr   << "Calculated hash is " << std::hex << hash
+                        << " expected " << std::hex << hashSum << '\n';
+            return false;
+        } else {
+            std::cout   << "\nFile " << filePath << " is correct\n";
+            std::cout   << "Calculated hash is " << std::hex << hash
+                        << " expected " << std::hex << hashSum << '\n';
+            return true;
         }
     }
 
     std::vector<JsonFile> parseJsonFile(const std::string& jsonFilePath) {
         std::vector<JsonFile> files;
-        
         try {
             std::ifstream file(jsonFilePath);
             if (!file.is_open()) {
                 throw Exceptions::FILE_OPEN_ERR("Cannot open file.");
             }
-            
+
             nlohmann::json jsonData;
             file >> jsonData;
             
             if (!jsonData.contains("files") || !jsonData["files"].is_array()) {
-                throw Exceptions::JSON_VAL_EXTRUCT_ERR("Invalid JSON format: Missing 'files' array.");
+                throw Exceptions::JSON_VAL_EXTRACT_ERR("Invalid JSON format: Missing 'files' array.");
             }
             
             for (const auto& item : jsonData["files"]) {
                 if (!item.contains("path") || !item.contains("hash")) {
-                    std::cerr << KRED << "Missing file: Nesessary fields are empty.\n" << RST;
-                    continue;
+                    files.clear();
+                    throw Exceptions::JSON_FORMAT_ERR("Error in json file: Necessary fields are empty.\n");
                 }
                 if (!item["path"].is_string() || !item["hash"].is_string()) {
-                    std::cerr << KRED << "Missing file: Invalid field's data.\n" << RST;
-                    continue;
+                    files.clear();
+                    throw Exceptions::JSON_FORMAT_ERR("Error in json file: Invalid field's data.\n");
                 }
 
                 JsonFile fileInfo;
-                std::string buff;
-                buff = item["path"].get<std::string>();
-                buff.erase(std::remove(buff.begin(), buff.end(), ' '), buff.end());
-                fileInfo.filePath = buff;
 
+                fileInfo.filePath = item["path"].get<std::string>();
+                std::string buff;
                 buff = item["hash"].get<std::string>();
                 buff.erase(std::remove(buff.begin(), buff.end(), ' '), buff.end());
                 fileInfo.hashSum = std::stoul(buff, nullptr, 16);
@@ -152,8 +148,9 @@ bool hashSumChecking(const std::string &jsonFilePath) {
     bool ret = true;
     try {
         std::vector<FilesFuncs::JsonFile> files = FilesFuncs::parseJsonFile(jsonFilePath);
-        size_t size = files.size();
-        size_t count = 0;
+        if (files.empty()) {
+            return false;
+        }
         for (std::vector<FilesFuncs::JsonFile>::iterator it = files.begin(); it != files.end(); ++it) {
             try {
                 if (!FilesFuncs::checkCurrentFile(it->filePath, it->hashSum)) {
@@ -207,6 +204,9 @@ bool test() {
         } catch (Exceptions::FILE_OPEN_ERR foEx) {
             std::cerr << KRED << foEx.what();
             std::cerr << "Cannot do this test\n" << RST;
+        } catch (Exceptions::FILE_SIZE_ERR fsEx) {
+            std::cerr << KRED << fsEx.what();
+            std::cerr << "Cannot get file size\n" << RST;
         }
         
     }
@@ -234,17 +234,16 @@ int main(int argc, char **argv) {
     if (std::string(argv[1]) == "-test") {
         return test();
     }
-    else  {
-        try {
-            if (hashSumChecking(argv[1])) {
-                std::cout << KGRN << "\nAll files are correct\n" << RST << std::endl;
-            } else {
-                std::cout << KRED << "\nSome files were changed\n" << RST << std::endl;
-            }
-        } catch (Exceptions::FILE_OPEN_ERR foEx) {
-            std::cerr << KRED << foEx.what() << '\n' << RST;
+    
+    try {
+        if (hashSumChecking(argv[1])) {
+            std::cout << KGRN << "\nAll files are correct\n" << RST << std::endl;
+        } else {
+            std::cout << KRED << "\nSome files were changed\n" << RST << std::endl;
         }
+    } catch (Exceptions::FILE_OPEN_ERR foEx) {
+        std::cerr << KRED << foEx.what() << '\n' << RST;
+    }
         
-        return 0;
-    }    
+    return 0;
 }
