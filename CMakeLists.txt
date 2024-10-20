@@ -9,5 +9,4 @@ project(hash-sum-utility)
 
 add_executable(hash-sum-utility 
                     main.cpp
-                    test.cpp
                 )

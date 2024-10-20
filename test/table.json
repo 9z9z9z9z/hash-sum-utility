@@ -1,0 +1,21 @@
+{
+    "files": 
+    [
+        {
+            "path": "/home/nikolay/hash-sum-utility/test/elden-ring-nawpic-11.jpg",
+            "hash": "7f755421"
+        },
+        {
+            "path": "/home/nikolay/hash-sum-utility/test/config.json",
+            "hash": "6f635711"
+        },
+        {
+            "path": "  ../test{1}.txt",
+            "hash": "1b851995"
+        },
+        {
+            "path": "/home/nikolay/hash-sum-utility/test/main_contorls.blk",
+            "hash": "8f6cb6a8"
+        }
+    ]
+}

@@ -3,10 +3,12 @@
 
 #include "../crc32/crc.hpp"
 
+const std::string DIRECTORY_PATH = "../test/";
+
 bool test() {
     std::cout << "\nTesting is started...\n";
     bool test_result = true;
-    std::cout << FYEL("==============================================================\n");
+    std::cout << KYEL << "==============================================================\n" << RST;
     std::cout << "Testing crc32 algorythm (string 123456789):\n";
     {
         std::string testStr1 = "123";
@@ -20,22 +22,22 @@ bool test() {
         std::cout << "Half string-> " << std::hex << testHalfHash << '\n';
         std::cout << "Single string-> " << std::hex << testSingleHash << '\n';
         if (testSingleHash == testHalfHash) {
-            std::cout << FGRN("Test passed") << '\n';
+            std::cout << KGRN << "Test passed\n" << RST;
         } else {
-            std::cout << FRED("Test failed") << '\n';
+            std::cout << KRED << "Test failed\n" << RST;
             test_result = false;
         }        
     }
-    std::cout << FYEL("==============================================================\n");
+    std::cout << KYEL << "==============================================================\n" << RST;
     std::cout << "Testing crc32 for single file (config.json):\n";
     {
         try {
-            uint32_t test_Hash = 0xf4c9c4c8;
+            uint32_t test_Hash = 0x6f635711;
 
-            if (CRC::checkCurrentFile("config.json", test_Hash)) {
-                std::cout << FGRN("Test passed") << '\n';
+            if (CRC::checkCurrentFile(DIRECTORY_PATH + "config.json", test_Hash)) {
+                std::cout << KGRN << "\nTest passed\n" << RST;
             } else {
-                std::cerr << FRED ("Test failed") << '\n';
+                std::cerr << KRED << "\nTest failed\n" << RST;
                 test_result = false;
             }
         } catch (Exceptions::FILE_OPEN_ERR foEx) {
@@ -47,11 +49,11 @@ bool test() {
         }
         
     }
-    std::cout << FYEL("==============================================================\n");
+    std::cout << KYEL << "==============================================================\n" << RST;
     std::cout << "Testing crc32 for table of files (reading from testing table.json):\n";
     {
         try {
-            if (CRC::hashSumChecking("table.json")) {
+            if (CRC::hashSumChecking(DIRECTORY_PATH + "table.json")) {
                 std::cout << KGRN << "\nTest passed\n";
             } else {
                 std::cerr << KRED << "\nTest failed\n";
@@ -63,6 +65,6 @@ bool test() {
         }
         
     }    
-    std::cout << FYEL("==============================================================\n") << std::endl;
+    std::cout << KYEL << "==============================================================\n" << RST;
     return test_result;
 }

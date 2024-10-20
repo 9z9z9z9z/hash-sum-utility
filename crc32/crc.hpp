@@ -1,4 +1,4 @@
-
+#pragma once
 #include "../stdafx.h"
 
 #include "../file_funcs/file_funcs.hpp"
@@ -44,14 +44,14 @@ namespace CRC {
         }
 
         if (hash != hashSum) {
-            std::cerr   << "\nFile " << filePath << " was changed\n";
-            std::cerr   << "Calculated hash is " << std::hex << hash
-                        << " expected " << std::hex << hashSum << '\n';
+            std::cerr << KRED   << "\nFile " << filePath << " was changed\n";
+            std::cerr           << "Calculated hash is " << std::hex << hash
+                                << " expected " << std::hex << hashSum << '\n' << RST;
             return false;
         } else {
-            std::cout   << "\nFile " << filePath << " is correct\n";
-            std::cout   << "Calculated hash is " << std::hex << hash
-                        << " expected " << std::hex << hashSum << '\n';
+            std::cout << KGRN   << "\nFile " << filePath << " is correct\n";
+            std::cout           << "Calculated hash is " << std::hex << hash
+                                << " expected " << std::hex << hashSum << '\n' << RST;
             return true;
         }
     }

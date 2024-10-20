@@ -9,4 +9,4 @@
 
 #include "exceptions/exceptions.hpp"
 #include "json/json.hpp"
-#include "../test/colors.h"
+#include "test/colors.h"
