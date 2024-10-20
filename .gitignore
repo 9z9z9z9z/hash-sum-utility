@@ -1,6 +1,5 @@
 *.exe
 *.jpg
 *.blk
-config.json
 
 build/
