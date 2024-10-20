@@ -1,7 +1,6 @@
 #include "stdafx.h"
 
 #include "test/test.hpp"
-
 #include "crc32/crc.hpp"
 
 
