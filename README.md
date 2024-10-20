@@ -23,6 +23,9 @@
 ## Билд утилиты:
 
 ```mkdir build```
+
 ```cd build```
+
 ```cmake ..```
+
 ```make```
