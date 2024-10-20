@@ -7,10 +7,10 @@
         },
         {
             "path": "config.json",
-            "hash": "f4c9c4c8"
+            "hash": "f4c9 c4c8"
         },
         {
-            "path": "  ../tesst.txt",
+            "path": "  ../test{1}.txt",
             "hash": "1b851995"
         },
         {

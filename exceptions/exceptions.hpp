@@ -1,6 +1,7 @@
 #pragma once
-#include <exception>
-#include <string>
+
+#include "../stdafx.h"
+
 
 namespace Exceptions {
 
@@ -36,4 +37,5 @@ class JSON_FORMAT_ERR : public BasicException {
 public:
     explicit JSON_FORMAT_ERR(const std::string &mes) : BasicException(mes) {}
 };
+
 }
