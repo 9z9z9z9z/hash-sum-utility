@@ -1,6 +1,8 @@
 #pragma once 
 #include "../stdafx.h"
 
+const static std::string PATH = "path";
+const static std::string HASH = "hash";
 
 namespace FilesFuncs {
     struct JsonFile {

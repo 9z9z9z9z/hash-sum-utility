@@ -4,8 +4,6 @@
 
 #include "crc32/crc.hpp"
 
-const static std::string PATH = "path";
-const static std::string HASH = "hash";
 
 int main(int argc, char **argv) {
     if (std::string(argv[1]) == "-test") {

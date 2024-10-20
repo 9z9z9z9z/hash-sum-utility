@@ -1,5 +1,4 @@
-#ifndef _COLORS_
-#define _COLORS_
+#pragma once
 
 /* FOREGROUND */
 #define RST     "\x1B[0m"
@@ -13,5 +12,3 @@
 
 #define BOLD(x) "\x1B[1m" x RST
 #define UNDL(x) "\x1B[4m" x RST
-
-#endif  /* _COLORS_ */
